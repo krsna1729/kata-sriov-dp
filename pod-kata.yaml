@@ -5,10 +5,9 @@ metadata:
   labels:
     env: test
   annotations:
-      kubernetes.v1.cni.cncf.io/networks: cnishim-net1
-      io.kubernetes.cri-o.TrustedSandbox: "false"
-      io.kubernetes.cri.untrusted-workload: "true"
+      k8s.v1.cni.cncf.io/networks: sriov-net
 spec:
+  runtimeClassName: kata
   containers:
   - name: appkata 
     image: centos/tools 

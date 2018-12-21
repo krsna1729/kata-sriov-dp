@@ -26,6 +26,25 @@ subjects:
   name: sriov-dp-sa
   namespace: kube-system
 ---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: sriov-config
+  namespace: kube-system
+data:
+  config.json: |
+    {
+      "resourceList":
+      [
+        {
+          "resourceName": "sriov",
+          "rootDevices": ["04:00.0"],
+          "sriovMode": true,
+          "deviceType": "netdevice"
+        }
+      ]
+    }
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -43,11 +62,10 @@ spec:
       serviceAccountName: sriov-dp-sa 
       initContainers:
       - name: init-sriov-dp
-        image: amshinde/multus-sriov-shim-device-plugin
+        image: amshinde/multus-sriov-shim-device-plugin:k8s-1.13
         command: [ "bash", "-c" ]
         args:
-        - cp /host/usr/bin/kubelet /host/usr/bin/kubelet_backup;
-          cp /tmp/cni/bin/{multus,sriov,cnishim} /host/opt/cni/bin/;
+        - cp /tmp/cni/bin/{multus,sriov} /host/opt/cni/bin/;
           cp /tmp/etc/cni/net.d/* /host/etc/cni/net.d/;
           systemctl stop kubelet;
           cp /tmp/bin/kubelet /host/usr/bin/kubelet;
@@ -71,13 +89,11 @@ spec:
           mountPath: /run/systemd
       containers:
       - name: sriov-dp
-        image: amshinde/multus-sriov-shim-device-plugin
+        image: amshinde/multus-sriov-shim-device-plugin:k8s-1.13
         command: [ "sh", "-c" ]
         args:
-        -  /tmp/bin/sriovdp --logtostderr -v 10;
+        - /tmp/bin/sriovdp --logtostderr -v 10;
           echo "exit status $?";
-          while true;
-          do sleep 36000; done;
         volumeMounts:
         - name: net
           mountPath: /sys/class/net
@@ -85,7 +101,13 @@ spec:
         - name: dp-sock
           mountPath: /var/lib/kubelet/device-plugins/
           readOnly: false
+        - mountPath: /etc/pcidp
+          name: sriov-config
+          readOnly: false
       volumes:
+      - name: sriov-config
+        configMap:
+          name: sriov-config
       - name: usr-bin
         hostPath:
           path: /usr/bin
@@ -112,3 +134,4 @@ spec:
           path: /var/lib/kubelet/device-plugins/
       hostNetwork: true
       hostPID: true
+
